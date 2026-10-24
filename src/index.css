@@ -1,0 +1,14 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+
+@theme {
+  --color-sec: #f0f2f5;
+  --color-main: #001f6b;
+  --font-sans: "Cairo", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background-color: var(--color-sec);
+  color: #0f172a;
+  font-family: var(--font-sans);
+}
