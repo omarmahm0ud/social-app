@@ -1,5 +1,6 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Bookmark, Globe, MessageCircle, Share2, ThumbsUp } from "lucide-react";
 import PostComment from "./PostComment";
 import EditPostModal from "./EditPostModal";
@@ -23,9 +24,7 @@ interface PostProps {
   post: PostCardI;
   variant?: "feed" | "details";
   defaultSaved?: boolean;
-  onDeleted?: (postId: string) => void;
-  onUpdated?: () => void;
-  onSavedChange?: (postId: string, saved: boolean) => void;
+  onDeleted?: () => void;
   children?: ReactNode;
 }
 
@@ -51,23 +50,39 @@ export default function Post({
   variant = "feed",
   defaultSaved,
   onDeleted,
-  onUpdated,
-  onSavedChange,
   children,
 }: PostProps) {
   const { user: currentUser, refreshUser } = useAuth();
   const { showToast } = useToast();
+  const queryClient = useQueryClient();
   const author = post.user;
-  const [isLiked, setIsLiked] = useState(checkIsLiked(post.likes, currentUser?._id));
-  const [likesCount, setLikesCount] = useState(post.likesCount ?? post.likes?.length ?? 0);
+  const serverLiked = checkIsLiked(post.likes, currentUser?._id);
+  const serverLikesCount = post.likesCount ?? post.likes?.length ?? 0;
+  const serverSaved = defaultSaved ?? checkIsSaved(post, currentUser);
+  const [isLiked, setIsLiked] = useState(serverLiked);
+  const [likesCount, setLikesCount] = useState(serverLikesCount);
   const [commentsCount, setCommentsCount] = useState(post.commentsCount ?? 0);
   const [topComment, setTopComment] = useState<CommentI | null>(post.topComment ?? null);
-  const [saved, setSaved] = useState<boolean>(
-    defaultSaved ?? checkIsSaved(post, currentUser),
-  );
+  const [saved, setSaved] = useState(serverSaved);
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    setIsLiked(serverLiked);
+  }, [serverLiked]);
+
+  useEffect(() => {
+    setLikesCount(serverLikesCount);
+  }, [serverLikesCount]);
+
+  useEffect(() => {
+    setSaved(serverSaved);
+  }, [serverSaved]);
+
+  useEffect(() => {
+    setCommentsCount(post.commentsCount ?? 0);
+    setTopComment(post.topComment ?? null);
+  }, [post.commentsCount, post.topComment?._id]);
 
   const isOwner = Boolean(
     currentUser?._id && author?._id && currentUser._id === author._id,
@@ -75,49 +90,56 @@ export default function Post({
   const totalComments = variant === "details" ? (post.commentsCount ?? 0) : commentsCount;
   const privacyLabel = (post.privacy ?? "public").replace(/[-_]/g, " ");
 
-  async function handleToggleLike() {
-    const nextLiked = !isLiked;
-    setIsLiked(nextLiked);
-    setLikesCount((count) => count + (nextLiked ? 1 : -1));
-    try {
-      await toggleLike(post._id);
-    } catch {
-      setIsLiked(!nextLiked);
-      setLikesCount((count) => count + (nextLiked ? -1 : 1));
+  const likeMutation = useMutation({
+    mutationFn: () => toggleLike(post._id),
+    onMutate: () => {
+      const next = !isLiked;
+      setIsLiked(next);
+      setLikesCount((count) => count + (next ? 1 : -1));
+      return { next };
+    },
+    onError: (_error, _variables, context) => {
+      const next = context?.next ?? false;
+      setIsLiked(!next);
+      setLikesCount((count) => count + (next ? -1 : 1));
       showToast("Could not update your like", "error");
-    }
-  }
+    },
+  });
 
-  async function handleToggleSave() {
-    const nextSaved = !saved;
-    setSaved(nextSaved);
-    try {
-      const res = await toggleBookmark(post._id);
+  const saveMutation = useMutation({
+    mutationFn: () => toggleBookmark(post._id),
+    onMutate: () => {
+      const next = !saved;
+      setSaved(next);
+      return { next };
+    },
+    onSuccess: (res, _variables, context) => {
       const flag = (res.data as { data?: { bookmarked?: unknown } } | undefined)?.data
         ?.bookmarked;
-      const finalSaved = typeof flag === "boolean" ? flag : nextSaved;
+      const finalSaved = typeof flag === "boolean" ? flag : (context?.next ?? true);
       setSaved(finalSaved);
       showToast(finalSaved ? "Post saved" : "Removed from saved", "success");
-      onSavedChange?.(post._id, finalSaved);
+      queryClient.invalidateQueries({ queryKey: ["posts", "saved"] });
       refreshUser().catch(() => undefined);
-    } catch {
-      setSaved(!nextSaved);
+    },
+    onError: (_error, _variables, context) => {
+      setSaved(!(context?.next ?? true));
       showToast("Could not update saved posts", "error");
-    }
-  }
+    },
+  });
 
-  async function handleDelete() {
-    setDeleting(true);
-    try {
-      await deletePost(post._id);
+  const deleteMutation = useMutation({
+    mutationFn: () => deletePost(post._id),
+    onSuccess: () => {
       showToast("Post deleted", "success");
-      onDeleted?.(post._id);
-    } catch {
-      setDeleting(false);
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      onDeleted?.();
+    },
+    onError: () => {
       setConfirmingDelete(false);
       showToast("Could not delete the post", "error");
-    }
-  }
+    },
+  });
 
   async function handleShare() {
     const url = `${window.location.origin}/postDetails/${post._id}`;
@@ -161,7 +183,7 @@ export default function Post({
         </div>
         <OptionsMenu
           saved={saved}
-          onToggleSave={handleToggleSave}
+          onToggleSave={() => saveMutation.mutate()}
           onEdit={isOwner ? () => setEditing(true) : undefined}
           onDelete={isOwner ? () => setConfirmingDelete(true) : undefined}
         />
@@ -216,7 +238,7 @@ export default function Post({
         <button
           type="button"
           aria-pressed={isLiked}
-          onClick={handleToggleLike}
+          onClick={() => likeMutation.mutate()}
           className={`flex min-h-11 flex-1 items-center justify-center gap-2 text-sm font-semibold transition hover:bg-gray-50 ${
             isLiked ? "bg-blue-50 text-blue-600" : "text-gray-600"
           }`}
@@ -260,23 +282,14 @@ export default function Post({
         children
       )}
 
-      {editing && (
-        <EditPostModal
-          post={post}
-          onClose={() => setEditing(false)}
-          onSaved={() => {
-            setEditing(false);
-            onUpdated?.();
-          }}
-        />
-      )}
+      {editing && <EditPostModal post={post} onClose={() => setEditing(false)} />}
 
       {confirmingDelete && (
         <ConfirmDialog
           title="Delete post"
           message="Are you sure you want to delete this post? This can't be undone."
-          loading={deleting}
-          onConfirm={handleDelete}
+          loading={deleteMutation.isPending}
+          onConfirm={() => deleteMutation.mutate()}
           onCancel={() => setConfirmingDelete(false)}
         />
       )}

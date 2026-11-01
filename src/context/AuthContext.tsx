@@ -5,92 +5,56 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { signin, signup, type RegisterPayload } from "../services/auth.services";
-import { getMyProfile } from "../services/profile.services";
-import { extractObject } from "../lib/api";
-import {
-  clearSession,
-  getToken,
-  readSavedUser,
-  saveToken,
-  saveUser,
-} from "../lib/session";
-import type { UserI } from "../types/user.types";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getProfile } from "../services/profile.services";
+import type { ProfileI } from "../types/user.types";
 
-interface AuthContextValue {
-  user: UserI | null;
-  loading: boolean;
-  login: (identifier: string, password: string) => Promise<void>;
-  register: (payload: RegisterPayload) => Promise<boolean>;
+interface AuthContextType {
+  token: string | null;
+  user: ProfileI | undefined;
+  login: (token: string) => void;
   logout: () => void;
-  refreshUser: () => Promise<void>;
-  replaceToken: (token: string) => void;
+  refreshUser: () => void;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
-
-function pickToken(body: unknown): string | undefined {
-  const root = body as { token?: string; data?: { token?: string } } | undefined;
-  return root?.data?.token ?? root?.token;
-}
+const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserI | null>(() =>
-    getToken() ? readSavedUser() : null,
-  );
-  const [loading, setLoading] = useState<boolean>(() => Boolean(getToken()));
+  const [token, setToken] = useState<string | null>(localStorage.getItem("token"));
+  const queryClient = useQueryClient();
 
-  async function loadProfile() {
-    const res = await getMyProfile();
-    const profile = extractObject<UserI>(res.data, "user");
-    saveUser(profile);
-    setUser(profile);
-  }
+  const { data: user, isError } = useQuery({
+    queryKey: ["profile"],
+    queryFn: async () => {
+      const { data } = await getProfile();
+      return (data.data.user ?? data.data) as ProfileI;
+    },
+    enabled: !!token,
+    retry: false,
+  });
 
-  useEffect(() => {
-    if (!getToken()) return;
-    loadProfile()
-      .catch(() => {
-        clearSession();
-        setUser(null);
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  async function login(identifier: string, password: string) {
-    const res = await signin(identifier, password);
-    const token = pickToken(res.data);
-    if (!token) throw new Error("No token received from the server");
-    saveToken(token);
-    await loadProfile();
-  }
-
-  async function register(payload: RegisterPayload) {
-    const res = await signup(payload);
-    const token = pickToken(res.data);
-    if (!token) return false;
-    saveToken(token);
-    await loadProfile();
-    return true;
+  function login(newToken: string) {
+    queryClient.clear();
+    localStorage.setItem("token", newToken);
+    setToken(newToken);
   }
 
   function logout() {
-    clearSession();
-    setUser(null);
+    localStorage.removeItem("token");
+    setToken(null);
+    queryClient.clear();
   }
 
-  async function refreshUser() {
-    await loadProfile();
+  function refreshUser() {
+    queryClient.invalidateQueries({ queryKey: ["profile"] });
   }
 
-  function replaceToken(token: string) {
-    saveToken(token);
-  }
+  useEffect(() => {
+    if (isError) logout();
+  }, [isError]);
 
   return (
-    <AuthContext.Provider
-      value={{ user, loading, login, register, logout, refreshUser, replaceToken }}
-    >
+    <AuthContext.Provider value={{ token, user, login, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
@@ -98,6 +62,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within AuthProvider");
+  if (!context) throw new Error("useAuth must be used inside AuthProvider");
   return context;
 }

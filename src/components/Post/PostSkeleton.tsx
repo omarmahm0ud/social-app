@@ -1,4 +1,4 @@
-export default function PostSkeleton() {
+function PostSkeleton() {
   return (
     <div className="mx-auto my-3 w-full max-w-2xl animate-pulse rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
       <div className="flex items-center gap-3">
@@ -16,3 +16,5 @@ export default function PostSkeleton() {
     </div>
   );
 }
+
+export default PostSkeleton;

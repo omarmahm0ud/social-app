@@ -7,7 +7,7 @@ interface ModalProps {
   children: ReactNode;
 }
 
-export default function Modal({ title, onClose, children }: ModalProps) {
+function Modal({ title, onClose, children }: ModalProps) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center sm:p-4"
@@ -32,3 +32,5 @@ export default function Modal({ title, onClose, children }: ModalProps) {
     </div>
   );
 }
+
+export default Modal;

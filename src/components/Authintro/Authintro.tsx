@@ -1,19 +1,19 @@
-const stats = [
-  { value: "2012", label: "Founded" },
-  { value: "40K+", label: "Graduates" },
-  { value: "50+", label: "Partner Companies" },
-  { value: "5", label: "Branches" },
-  { value: "20", label: "Diplomas Available" },
-];
 
+const stats = [
+  { value: '2012', label: 'Founded' },
+  { value: '40K+', label: 'Graduates' },
+  { value: '50+', label: 'Partner Companies' },
+  { value: '5', label: 'Branches' },
+  { value: '20', label: 'Diplomas Available' },
+]
 function AuthIntro() {
-  return (
-    <div>
-      <h1 className="text-5xl font-extrabold tracking-tight text-blue-900 sm:text-6xl">
+ return (
+    <div className="">
+      <h1 className="text-6xl font-extrabold tracking-tight text-blue-900">
         Route Posts
       </h1>
 
-      <p className="mt-4 max-w-2xl text-xl text-slate-700 sm:text-2xl">
+      <p className="mt-4 max-w-2xl text-2xl text-slate-700">
         Connect with friends and the world around you on Route Posts.
       </p>
 
@@ -29,9 +29,9 @@ function AuthIntro() {
         <p className="mt-4 leading-relaxed text-slate-600">
           Route Academy is the premier IT training center in Egypt, established in
           2012. We specialize in delivering high-quality training courses in
-          programming, web development, and application development. We've
-          identified the unique challenges people may face when learning new
-          technology and made efforts to provide strategies to overcome them.
+          programming, web development, and application development. We've identified
+          the unique challenges people may face when learning new technology and made
+          efforts to provide strategies to overcome them.
         </p>
 
         <div className="mt-6 flex flex-wrap gap-4">
@@ -49,7 +49,7 @@ function AuthIntro() {
         </div>
       </div>
     </div>
-  );
+  )
 }
 
-export default AuthIntro;
+export default AuthIntro

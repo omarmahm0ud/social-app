@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router";
 import { Home, KeyRound, LogOut, Menu, User } from "lucide-react";
 import ChangePasswordModal from "../common/ChangePasswordModal";
-import { AVATAR_FALLBACK } from "../../constants";
+import { defaultAvatar } from "../../constants";
 import { useAuth } from "../../context/AuthContext";
 
 const navLinks = [
@@ -15,17 +15,6 @@ function Navbar() {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   function handleLogout() {
     logout();
@@ -46,33 +35,36 @@ function Navbar() {
           </Link>
 
           <nav className="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1">
-            {navLinks.map(({ to, label, icon: Icon }) => (
-              <NavLink
-                key={to}
-                to={to}
-                className={({ isActive }) =>
-                  `flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition sm:px-4 ${
-                    isActive
-                      ? "bg-white text-blue-600 shadow-sm"
-                      : "text-slate-600 hover:text-slate-900"
-                  }`
-                }
-              >
-                <Icon size={20} />
-                <span className="hidden sm:inline">{label}</span>
-              </NavLink>
-            ))}
+            {navLinks.map((link) => {
+              const Icon = link.icon;
+              return (
+                <NavLink
+                  key={link.to}
+                  to={link.to}
+                  className={({ isActive }) =>
+                    `flex items-center gap-2 rounded-full px-3 py-2 text-sm font-semibold transition sm:px-4 ${
+                      isActive
+                        ? "bg-white text-blue-600 shadow-sm"
+                        : "text-slate-600 hover:text-slate-900"
+                    }`
+                  }
+                >
+                  <Icon size={20} />
+                  <span className="hidden sm:inline">{link.label}</span>
+                </NavLink>
+              );
+            })}
           </nav>
 
-          <div className="relative shrink-0" ref={menuRef}>
+          <div className="relative shrink-0">
             <button
               type="button"
               aria-label="Account menu"
-              onClick={() => setMenuOpen((value) => !value)}
+              onClick={() => setMenuOpen(!menuOpen)}
               className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 py-1 pl-1 pr-3"
             >
               <img
-                src={user?.photo || AVATAR_FALLBACK}
+                src={user?.photo || defaultAvatar}
                 alt={user?.name}
                 className="size-9 rounded-full object-cover"
               />
@@ -82,38 +74,47 @@ function Navbar() {
               <Menu size={18} className="text-slate-500" />
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-12 z-40 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+              <>
                 <button
                   type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    navigate("/profile");
-                  }}
-                  className="flex w-full items-center gap-2 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  <User size={16} />
-                  Profile
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    setChangingPassword(true);
-                  }}
-                  className="flex w-full items-center gap-2 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  <KeyRound size={16} />
-                  Change password
-                </button>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="flex w-full items-center gap-2 px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50"
-                >
-                  <LogOut size={16} />
-                  Log out
-                </button>
-              </div>
+                  aria-label="Close menu"
+                  tabIndex={-1}
+                  className="fixed inset-0 z-30 cursor-default"
+                  onClick={() => setMenuOpen(false)}
+                />
+                <div className="absolute right-0 top-12 z-40 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      navigate("/profile");
+                    }}
+                    className="flex w-full items-center gap-2 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    <User size={16} />
+                    Profile
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setChangingPassword(true);
+                    }}
+                    className="flex w-full items-center gap-2 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    <KeyRound size={16} />
+                    Change password
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-2 px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50"
+                  >
+                    <LogOut size={16} />
+                    Log out
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

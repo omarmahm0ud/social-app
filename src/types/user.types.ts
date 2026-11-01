@@ -1,24 +1,17 @@
-export interface UserI {
-  _id: string;
-  name: string;
-  username?: string;
+import type { UserI } from "./postCard.types";
+
+export interface ProfileI extends UserI {
   email?: string;
-  photo?: string;
   followersCount?: number;
   followingCount?: number;
   bookmarksCount?: number;
-  postsCount?: number;
-  followers?: unknown[];
-  following?: unknown[];
   bookmarks?: Array<string | { _id: string }>;
 }
 
-export interface SuggestedUserI {
+export interface FriendI {
   _id: string;
   name: string;
   username?: string;
   photo?: string;
   followersCount?: number;
-  mutualFollowersCount?: number;
-  isFollowing?: boolean;
 }

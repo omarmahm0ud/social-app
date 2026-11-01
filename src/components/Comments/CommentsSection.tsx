@@ -1,4 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { Button } from "@heroui/react";
 import CommentItem from "./CommentItem";
 import OptionsMenu from "../common/OptionsMenu";
@@ -20,7 +25,6 @@ interface CommentsSectionProps {
   postId: string;
   postOwnerId?: string;
   commentsCount: number;
-  onCountChange: (delta: number) => void;
 }
 
 interface CommentRowProps {
@@ -89,87 +93,77 @@ export default function CommentsSection({
   postId,
   postOwnerId,
   commentsCount,
-  onCountChange,
 }: CommentsSectionProps) {
   const { user } = useAuth();
   const { showToast } = useToast();
-  const [comments, setComments] = useState<CommentI[]>([]);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState("");
+  const queryClient = useQueryClient();
   const [deleteTarget, setDeleteTarget] = useState<CommentI | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
-  async function loadComments(nextPage: number) {
-    if (nextPage > 1) setLoadingMore(true);
-    try {
-      const res = await getPostComments(postId, nextPage, PAGE_SIZE);
-      const list = extractList<CommentI>(res.data, "comments");
-      setComments((current) => (nextPage === 1 ? list : [...current, ...list]));
-      setHasMore(list.length === PAGE_SIZE);
-      setPage(nextPage);
-      setError("");
-    } catch {
-      setError("Could not load comments");
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
+  const commentsQuery = useInfiniteQuery({
+    queryKey: ["comments", postId],
+    queryFn: async ({ pageParam }) => {
+      const res = await getPostComments(postId, pageParam, PAGE_SIZE);
+      return extractList<CommentI>(res.data, "comments");
+    },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length === PAGE_SIZE ? allPages.length + 1 : undefined,
+    select: (data) => data.pages.flat(),
+  });
+
+  const comments = commentsQuery.data ?? [];
+
+  function refreshAfterChange() {
+    queryClient.invalidateQueries({ queryKey: ["comments", postId] });
+    queryClient.invalidateQueries({ queryKey: ["post", postId] });
   }
 
-  useEffect(() => {
-    loadComments(1);
-  }, [postId]);
+  const editMutation = useMutation({
+    mutationFn: ({ commentId, content }: { commentId: string; content: string }) =>
+      updateComment(postId, commentId, content),
+    onSuccess: () => {
+      showToast("Comment updated", "success");
+      queryClient.invalidateQueries({ queryKey: ["comments", postId] });
+    },
+    onError: (error) =>
+      showToast(getErrorMessage(error, "Could not update the comment"), "error"),
+  });
 
-  function handleAdded(comment: CommentI) {
-    setComments((current) => [...current, comment]);
-    onCountChange(1);
-  }
+  const deleteMutation = useMutation({
+    mutationFn: (commentId: string) => deleteComment(postId, commentId),
+    onSuccess: () => {
+      showToast("Comment deleted", "success");
+      setDeleteTarget(null);
+      refreshAfterChange();
+    },
+    onError: (error) =>
+      showToast(getErrorMessage(error, "Could not delete the comment"), "error"),
+  });
 
   async function handleSaveEdit(commentId: string, content: string) {
     try {
-      await updateComment(postId, commentId, content);
-      setComments((current) =>
-        current.map((item) => (item._id === commentId ? { ...item, content } : item)),
-      );
-      showToast("Comment updated", "success");
+      await editMutation.mutateAsync({ commentId, content });
       return true;
-    } catch (err) {
-      showToast(getErrorMessage(err, "Could not update the comment"), "error");
+    } catch {
       return false;
     }
   }
 
-  async function handleConfirmDelete() {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      await deleteComment(postId, deleteTarget._id);
-      setComments((current) => current.filter((item) => item._id !== deleteTarget._id));
-      onCountChange(-1);
-      setDeleteTarget(null);
-      showToast("Comment deleted", "success");
-    } catch (err) {
-      showToast(getErrorMessage(err, "Could not delete the comment"), "error");
-    } finally {
-      setDeleting(false);
-    }
-  }
-
   const isPostOwner = Boolean(user?._id && postOwnerId && user._id === postOwnerId);
+  const total = commentsQuery.hasNextPage
+    ? Math.max(commentsCount, comments.length)
+    : comments.length;
 
   return (
     <section aria-label="Comments" className="px-4 pb-5 pt-4 sm:px-5">
       <div className="mb-4 flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3">
         <h2 className="text-base font-bold text-slate-900">Comments</h2>
         <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-600">
-          {Math.max(commentsCount, comments.length)}
+          {commentsQuery.isPending ? commentsCount : total}
         </span>
       </div>
 
-      {loading ? (
+      {commentsQuery.isPending ? (
         <div className="space-y-3">
           {[0, 1, 2].map((item) => (
             <div key={item} className="flex animate-pulse items-start gap-2.5">
@@ -178,8 +172,8 @@ export default function CommentsSection({
             </div>
           ))}
         </div>
-      ) : error ? (
-        <p className="text-sm text-red-600">{error}</p>
+      ) : commentsQuery.isError && comments.length === 0 ? (
+        <p className="text-sm text-red-600">Could not load comments</p>
       ) : comments.length === 0 ? (
         <p className="text-sm text-slate-500">No comments yet. Be the first to comment.</p>
       ) : (
@@ -202,28 +196,28 @@ export default function CommentsSection({
         </div>
       )}
 
-      {hasMore && (
+      {commentsQuery.hasNextPage && (
         <Button
           variant="secondary"
           size="sm"
           className="mt-4"
-          isDisabled={loadingMore}
-          onPress={() => loadComments(page + 1)}
+          isDisabled={commentsQuery.isFetchingNextPage}
+          onPress={() => commentsQuery.fetchNextPage()}
         >
-          {loadingMore ? "Loading..." : "Load more comments"}
+          {commentsQuery.isFetchingNextPage ? "Loading..." : "Load more comments"}
         </Button>
       )}
 
       <div className="mt-5">
-        <PostComment postId={postId} onAdded={handleAdded} />
+        <PostComment postId={postId} />
       </div>
 
       {deleteTarget && (
         <ConfirmDialog
           title="Delete comment"
           message="Are you sure you want to delete this comment?"
-          loading={deleting}
-          onConfirm={handleConfirmDelete}
+          loading={deleteMutation.isPending}
+          onConfirm={() => deleteMutation.mutate(deleteTarget._id)}
           onCancel={() => setDeleteTarget(null)}
         />
       )}

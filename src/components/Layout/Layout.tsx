@@ -1,7 +1,7 @@
 import { Outlet } from "react-router";
 import Navbar from "../Navbar/Navbar";
 
-export default function Layout() {
+function Layout() {
   return (
     <div className="min-h-screen bg-sec">
       <Navbar />
@@ -9,3 +9,5 @@ export default function Layout() {
     </div>
   );
 }
+
+export default Layout;

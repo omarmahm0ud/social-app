@@ -1,15 +1,28 @@
-import http from "./http";
+import axios from "axios";
+import { baseUrl } from "../constants";
+import { getHeaders } from "./headers";
 
-export const getMyProfile = () => http.get("/users/profile-data");
+export function getProfile() {
+  return axios.get(`${baseUrl}/users/profile-data`, getHeaders());
+}
 
-export const uploadProfilePhoto = (file: File) => {
+export function uploadPhoto(file: File) {
   const formData = new FormData();
   formData.append("photo", file);
-  return http.put("/users/upload-photo", formData);
-};
+  return axios.put(`${baseUrl}/users/upload-photo`, formData, getHeaders());
+}
 
-export const changePassword = (password: string, newPassword: string) =>
-  http.patch("/users/change-password", { password, newPassword });
+export function changePassword(password: string, newPassword: string) {
+  return axios.patch(
+    `${baseUrl}/users/change-password`,
+    { password, newPassword },
+    getHeaders(),
+  );
+}
 
-export const getUserPosts = (userId: string, page = 1, limit = 10) =>
-  http.get(`/users/${userId}/posts`, { params: { page, limit } });
+export function getUserPosts(userId: string, page = 1) {
+  return axios.get(`${baseUrl}/users/${userId}/posts`, {
+    ...getHeaders(),
+    params: { page, limit: 10 },
+  });
+}

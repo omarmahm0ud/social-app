@@ -1,25 +1,10 @@
-import http from "./http";
+import axios from "axios";
+import { baseUrl } from "../constants";
 
-export interface RegisterPayload {
-  name: string;
-  username?: string;
-  email: string;
-  password: string;
-  rePassword: string;
-  dateOfBirth: string;
-  gender: string;
+export function loginUser(values: object) {
+  return axios.post(`${baseUrl}/users/signin`, values);
 }
 
-export const signin = (identifier: string, password: string) =>
-  http.post(
-    "/users/signin",
-    identifier.includes("@")
-      ? { email: identifier, password }
-      : { username: identifier, password },
-  );
-
-export const signup = (payload: RegisterPayload) => {
-  const body = { ...payload };
-  if (!body.username?.trim()) delete body.username;
-  return http.post("/users/signup", body);
-};
+export function registerUser(values: object) {
+  return axios.post(`${baseUrl}/users/signup`, values);
+}

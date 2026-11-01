@@ -8,15 +8,15 @@ interface AuthLayoutProps {
   children: ReactNode;
 }
 
-const tabClass = (active: boolean) =>
-  `rounded-xl px-4 py-2.5 text-center text-sm font-bold transition ${
-    active ? "bg-white text-blue-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
-  }`;
+function AuthLayout({ tab, children }: AuthLayoutProps) {
+  const { token } = useAuth();
 
-export default function AuthLayout({ tab, children }: AuthLayoutProps) {
-  const { user, loading } = useAuth();
+  if (token) return <Navigate to="/feed" replace />;
 
-  if (!loading && user) return <Navigate to="/feed" replace />;
+  const tabClass = (active: boolean) =>
+    `rounded-xl px-4 py-2.5 text-center text-sm font-bold transition ${
+      active ? "bg-white text-blue-900 shadow-sm" : "text-slate-600 hover:text-slate-900"
+    }`;
 
   return (
     <main className="min-h-screen bg-sec px-4 py-10 sm:px-8 lg:px-16">
@@ -37,3 +37,5 @@ export default function AuthLayout({ tab, children }: AuthLayoutProps) {
     </main>
   );
 }
+
+export default AuthLayout;

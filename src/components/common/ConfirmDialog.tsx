@@ -4,16 +4,14 @@ import Modal from "./Modal";
 interface ConfirmDialogProps {
   title: string;
   message: string;
-  confirmLabel?: string;
   loading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-export default function ConfirmDialog({
+function ConfirmDialog({
   title,
   message,
-  confirmLabel = "Delete",
   loading = false,
   onConfirm,
   onCancel,
@@ -26,9 +24,11 @@ export default function ConfirmDialog({
           Cancel
         </Button>
         <Button variant="danger" onPress={onConfirm} isDisabled={loading}>
-          {loading ? "Please wait..." : confirmLabel}
+          {loading ? "Please wait..." : "Delete"}
         </Button>
       </div>
     </Modal>
   );
 }
+
+export default ConfirmDialog;
